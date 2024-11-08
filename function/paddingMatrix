@@ -1,0 +1,145 @@
+############################ INSERT IMAGE INTO THE PADDING IMAGE ############################
+insert_image_to_padded:
+    lw  $t0, p                   # Load the padding size
+    lw  $t1, N                   # Load the image matrix size (N)
+
+    move $s2, $s2                # Base address of the padded matrix (already allocated)
+    la   $t2, imageMatrix        # Base address of the image matrix
+
+    li   $t3, 0                  # Initialize row index for the image matrix
+insert_image_rows:
+    bge  $t3, $t1, insert_done   # If all rows of the image matrix are copied, exit the loop
+    li   $t4, 0                  # Initialize column index for the image matrix
+
+insert_image_columns:
+    bge  $t4, $t1, next_image_row # If all columns of the image matrix row are copied, move to the next row
+
+    # Load the element from the image matrix
+    lwc1 $f0, 0($t2)             # Load the element at position (row, col) of the image matrix
+
+    # Calculate the target position in the padded matrix
+    # padded_row = t3 + paddingNum
+    # padded_col = t4 + paddingNum
+    add  $t5, $t3, $t0           # Calculate padded_row = image_row + paddingNum
+    add  $t6, $t4, $t0           # Calculate padded_col = image_col + paddingNum
+
+    # Calculate the address in the padded matrix: padded_base + ((padded_row * padded_size) + padded_col) * 4
+    mul  $t7, $t5, $t1           # t7 = padded_row * padded_size
+    add  $t7, $t7, $t6           # t7 = padded_row * padded_size + padded_col
+    sll  $t7, $t7, 2             # t7 = (padded_row * padded_size + padded_col) * 4 (byte offset)
+
+    # Now, calculate the actual address using the base of the padded matrix
+    add  $t7, $s2, $t7           # t7 is the actual address of the padded matrix
+
+    # Store the image matrix element into the calculated address in the padded matrix
+    swc1 $f0, 0($t7)             # Store the element at the calculated position in the padded matrix
+
+    # Move to the next column in the image matrix
+    addi $t2, $t2, 4             # Move to the next element in the image matrix (4 bytes per float)
+    addi $t4, $t4, 1             # Increment the column index
+    j    insert_image_columns     # Repeat for the next column
+
+next_image_row:
+    addi $t3, $t3, 1             # Move to the next row in the image matrix
+    j    insert_image_rows        # Repeat for the next row
+
+insert_done:
+    jr   $ra                      # Return to the caller
+
+
+
+
+############################# PRINT THE PADDING IMAGE ###############################
+print_padded_matrix:
+    # $a0 contains the size of the padded matrix (N + 2 * padding)
+    # $a1 contains the base address of the padded matrix
+    li $t1, 5                # Number of rows/columns in the padded matrix
+    move $t2, $s2                # Base address of the padded matrix
+
+    li   $t3, 0                  # Row index
+print_rows:
+    bge  $t3, $t1, print_done    # If all rows printed, exit
+    li   $t4, 0                  # Column index
+
+print_columns:
+    bge  $t4, $t1, next_row      # If all columns in the row printed, move to the next row
+
+    l.s $f12, 0($t2)            # Load the current element into the floating-point register $f12
+    li   $v0, 2                  # Syscall for printing floating-point numbers
+    syscall
+
+    # Print a space after the element
+    li   $v0, 4                  # Syscall for printing strings
+    la   $a0, space              # Load the address of the space string
+    syscall
+
+    addi $t2, $t2, 4             # Move to the next element (4 bytes per float)
+    addi $t4, $t4, 1             # Increment column index
+    j    print_columns
+
+next_row:
+    # Print a newline after each row
+    li   $v0, 4                  # Syscall for printing strings
+    la   $a0, newline            # Load the address of the newline string
+    syscall
+
+    addi $t3, $t3, 1             # Increment row index
+    j    print_rows
+
+print_done:
+    #jr   $ra                      # Return to the caller
+
+.data
+M:      .word 2            # Size of the kernel matrix (M = 2)
+N:      .word 3            # Size of the image matrix (N = 3)
+
+.text
+.globl main
+
+main:
+    # Step 1: Load the size of the image and kernel matrices
+    lw   $t0, N             # Load N (size of image matrix, N = 3)
+    lw   $t1, M             # Load M (size of kernel matrix, M = 2)
+
+    # Step 2: Calculate the number of elements in the image matrix
+    mul  $t2, $t0, $t0      # t2 = N * N (number of elements in the image matrix)
+
+    # Step 3: Calculate the offset to skip the image matrix
+    li   $t3, 4             # Each element is 4 bytes (word)
+    mul  $t2, $t2, $t3      # t2 = N * N * 4 (byte offset to skip image matrix)
+
+    # Step 4: Calculate the address of the first element of the kernel matrix
+    add  $t4, $s1, $t2      # t4 = base address of kernel matrix (s1 + offset)
+
+    # Step 5: Dynamically allocate memory for the kernel matrix
+    # Calculate the total number of bytes required for the kernel matrix
+    mul  $t5, $t1, $t1      # t5 = M * M (number of elements in the kernel matrix)
+    mul  $t5, $t5, $t3      # t5 = M * M * 4 (total bytes required)
+
+    move $a0, $t5           # Pass the number of bytes to allocate in $a0
+    li   $v0, 9             # Syscall for memory allocation (sbrk)
+    syscall                 # Allocate memory for the kernel matrix
+    move $s3, $v0           # Save the base address of the allocated space for the kernel matrix
+
+    # Step 6: Copy the kernel matrix from the original array to the newly allocated array
+    li   $t6, 0             # Initialize element counter for kernel matrix
+    copy_kernel:
+        bge  $t6, $t5, copy_done  # Stop copying after all elements are copied
+
+        lwc1 $f0, 0($t4)         # Load the floating-point element from the original array (kernel matrix)
+        swc1 $f0, 0($s3)         # Store the element into the newly allocated array
+
+        addi $t4, $t4, 4         # Move to the next element in the original array (4 bytes)
+        addi $s3, $s3, 4         # Move to the next position in the new array (4 bytes)
+        addi $t6, $t6, 4         # Increment the element counter by 4 (bytes)
+        j    copy_kernel          # Repeat until all elements are copied
+
+    copy_done:
+    # Finished copying, now you can use the kernel matrix stored at $s3
+    li   $v0, 10             # Exit the program
+    syscall
+    
+    
+    
+    
+    
