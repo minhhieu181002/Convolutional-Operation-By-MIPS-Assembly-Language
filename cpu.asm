@@ -1,5 +1,12 @@
+#-----------------------------------------------------------#
+#		 PROJECT COMPUTER ARCHITECTURE		    #
+#		    TITLE: Convolutional Operation	    #
+#		    Author: Hua Vũ Minh Hieu		    #
+#		    Stu. ID: 2052990			    #
+#		    Date: 11/08/2024			    #
+#-----------------------------------------------------------#
 .data
-    inputFile:    .asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/inputMatrix2.txt"   # Input file name
+    inputFile:    .asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/testcase/input/1.txt"   # Input file name
     buffer:       .space 200                                      # Buffer to read file content (adjust size if necessary)
     N:            .word 0                                         # To store image matrix size (N)
     M:            .word 0                                         # To store kernel matrix size (M)
@@ -39,25 +46,28 @@
 
     # --- Parsing N ---
     li $t1, 0               # Initialize register to store parsed value of N
+  
 parse_N_loop:
     lb $t2, 0($t0)          # Load first byte (ASCII value of the first character)
-    beq $t2, 32, parse_M    # Break on space (ASCII 32) to move to the next number
+    beq $t2, 46, parse_M
+    #beq $t2, 32, parse_M    # Break on space (ASCII 32) to move to the next number
     sub $t2, $t2, 48        # Convert ASCII to integer (subtract ASCII '0')
     mul $t1, $t1, 10        # Shift left (multiply by 10 to prepare for the next digit)
     add $t1, $t1, $t2       # Add the parsed digit to the value
     addi $t0, $t0, 1        # Move to the next character in the buffer
     j parse_N_loop          # Continue parsing N
+
 parse_M:
     sw $t1, N               # Store parsed N
 
     # --- Skip space after N ---
-    addi $t0, $t0, 1        # Skip the space after N
+    addi $t0, $t0, 3        # Skip the space after N
 
     # --- Parsing M ---
     li $t1, 0               # Reset the value for M
 parse_M_loop:
     lb $t2, 0($t0)          # Load the next character for M
-    beq $t2, 32, parse_p    # Break on space to parse next integer (padding)
+    beq $t2, 46, parse_p    # Break on space to parse next integer (padding)
     sub $t2, $t2, 48        # Convert ASCII to integer
     mul $t1, $t1, 10        # Multiply by 10 to shift left
     add $t1, $t1, $t2       # Add parsed digit to M
@@ -67,13 +77,13 @@ parse_p:
     sw $t1, M               # Store parsed M
 
     # --- Skip space after M ---
-    addi $t0, $t0, 1        # Skip the space after M
+    addi $t0, $t0, 3        # Skip the space after M
 
     # --- Parsing p (padding) ---
     li $t1, 0               # Reset the value for p
 parse_p_loop:
     lb $t2, 0($t0)          # Load the next character for p
-    beq $t2, 32, parse_s    # Break on space to parse next integer (stride)
+    beq $t2, 46, parse_s    # Break on space to parse next integer (stride)
     sub $t2, $t2, 48        # Convert ASCII to integer
     mul $t1, $t1, 10        # Multiply by 10 to shift left
     add $t1, $t1, $t2       # Add parsed digit to p
@@ -83,13 +93,13 @@ parse_s:
     sw $t1, p               # Store parsed p
 
     # --- Skip space after p ---
-    addi $t0, $t0, 1        # Skip the space after p
+    addi $t0, $t0, 3        # Skip the space after p
 
     # --- Parsing s (stride) ---
     li $t1, 0               # Reset the value for s
 parse_s_loop:
     lb $t2, 0($t0)          # Load the next character for s
-    beq $t2, 13, done_parsing  # Break on newline (ASCII 13) - carriage return
+    beq $t2, 46, done_parsing  # Break on newline (ASCII 13) - carriage return
     sub $t2, $t2, 48        # Convert ASCII to integer
     mul $t1, $t1, 10        # Multiply by 10 to shift left
     add $t1, $t1, $t2       # Add parsed digit to s
@@ -97,7 +107,6 @@ parse_s_loop:
     j parse_s_loop          # Loop until newline
 done_parsing:
     sw $t1, s               # Store parsed s
-
     # --- Dynamically allocate memory for 2 matrix ---
     lw $t1, N               # Load N (size of the image matrix)
     lw $t2, M
@@ -117,7 +126,8 @@ done_parsing:
     move $t7, $s1        # use $t7 for adjust the address of the array 
 
     # --- Parsing the image matrix ---
-    addi $t0, $t0, 2        # Move pointer after the first row
+    addi $t0, $t0, 3        # Move pointer after the first row
+    li $t3, 0 		#variable for check negative
     li $t5, 0               # Index counter for image matrix elements
     #li $t6, 6               # Load the size of the image matrix (N * N)
 
@@ -150,6 +160,7 @@ done_parsing_matrices:
 # --- Function to parse a floating-point number from the buffer ---
 parse_floating_point:
     lb $t2, 0($t0)
+    beq $t2, 45, saveSign
     beq $t2, 0, finish_parsing              # If null terminator (end of string), stop
     beq $t2, 46, parse_fraction_part        # If '.', switch to parsing the fractional part
     beq $t2, 32,  finish_parsing            # If space, we're done with this number
@@ -172,6 +183,11 @@ nextDigit:
 	lb $t2, 0($t0) #if the next byte is not "." => does not have fraction part
 	beq $t2, 32, finish_parsing
 	j parse_floating_point
+saveSign:
+	addi $t3,$t3, 1    #the is number is negative number
+	addi $t0, $t0, 1 #ignore this sign
+	j parse_floating_point
+	
 parse_fraction_part:
 	addi $t0,$t0,1
 parse_fraction_loop:
@@ -190,12 +206,18 @@ parse_fraction_loop:
 	mul.s $f9,$f9,$f10     #multiply divisor by 10 for the next fractional digit
 	addi $t0,$t0,1
 	j parse_fraction_loop
-	
+
 finish_parsing:
 	addi $t0,$t0,1
 	add.s $f0,$f0,$f6 #add fractional part to the integer part
+	beq $t3, 1, conToNegNum
 	jr $ra
-
+conToNegNum:
+	neg.s $f0, $f0
+	li $t3, 0
+	jr $ra
+	
+	
 parse_kernel_matrix:
 	addi $t0,$t0,2
 	jr $ra
