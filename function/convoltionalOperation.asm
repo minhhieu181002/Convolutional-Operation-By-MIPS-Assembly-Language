@@ -1,24 +1,21 @@
     .data
-sizeOfPaddedMatrix:  .word 5         # Size of padded matrix (5x5)
-sizeOfKernelMatrix:  .word 3         # Size of kernel matrix (2x2)
+sizeOfPaddedMatrix:  .word 3         # Size of padded matrix (5x5)
+sizeOfKernelMatrix:  .word 2         # Size of kernel matrix (2x2)
 paddingValue:        .word 0         # No padding in this case
-strideValue:         .word 1         # Stride of 1
+strideValue:         .word 2         # Stride of 1
 outputSize:          .word 0         # Output matrix size will be calculated (4x4)
 newline:    .asciiz "\n"             # For printing new lines
 space:      .asciiz " "              # For printing a space between elements
 # Define the padded matrix (5x5)
 paddedMatrix:  
-    .float -1.2, -1.5, -2.1, 0, 0   # Row 1
-    .float 0, -1.0, 1.0, 1.0, 0   # Row 2
-    .float 0, 0, 1.0, 1.0, 1.0   # Row 3
-    .float 0, 0, 1.0, 1.0, 0   # Row 4
-    .float 0, 1.0, -1.0, 0 0   # Row 5
+    .float -5.6, -1.1, -5.6
+    .float -3.3, 1.0, -5.6   # Row 1
+    .float -1.1, -5.6, -3.3   # Row 2
 
 # Define the kernel matrix (2x2)
 kernelMatrix:  
-    .float 1.0, 0, 1.0   # Row 1
-    .float 0, -1.0, 0   # Row 2
-    .float 1.0, 0, 1.0
+    .float -1.0 -1.1   # Row 1
+    .float -1.1 -1.5   # Row 2
 
     .text
     .globl main
