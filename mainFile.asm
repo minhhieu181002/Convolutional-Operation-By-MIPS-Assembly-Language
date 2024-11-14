@@ -6,17 +6,17 @@
 #		    Date: 11/08/2024			    #
 #-----------------------------------------------------------#
 .data
-    inputFile:    .asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/testcase/input/1_2.txt"   # Input file name
-    fout:    .asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/testcase/output/output.txt"
-    buffer:       .space 200                                      # Buffer to read file content (adjust size if necessary)
+    inputFile:    .asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/C++/testcaseGeneration/testcases/testcase11.txt"   # Input file name
+    fout:    .asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/C++/output/output.txt"
+    buffer:       .space 1024                                      # Buffer to read file content (adjust size if necessary)
     N:            .word 0                                         # To store image matrix size (N)
     M:            .word 0                                         # To store kernel matrix size (M)
     p:            .word 0                                         # To store padding value (p)
     s:            .word 0                                         # To store stride value (s)
     outputSize:	   .word 0
-    image: 	  .float 0.0:49
+    image: 	  .float 0.0:50
     kernel: 	   .float 0.0:16
-    ouput: 	   .float 0.0:49
+    ouput: 	   .float 0.0:196
     paddedSize:    .word 0					  # To store the size of padded matrix
     newline:      .asciiz "\n"                                    # Newline string for printing
     space:        .asciiz " "                                     # Space between matrix elements
@@ -24,6 +24,8 @@
     titleImageMatrix: .asciiz "The image matrix is: "
     titleKernelMatrix: .asciiz "The kernel matrix is:\n "
     titlePaddedMatrix: .asciiz "The image matrix after padded is: \n"
+    titleOutputMatrix: .asciiz "The output matrix is: \n"
+    titleBufferOutput: .asciiz "The buffer output is: \n"
     zero:          .float 0.0         # Zero value for padding
     kernelMatrix: .asciiz "The Kernel Matrix"
     startPerformOperation: .asciiz "Start to perform convolutional operation...\n"
@@ -47,7 +49,7 @@
     li $v0, 14              # Syscall for reading from file
     move $a0, $s0           # File descriptor (in $s0)
     la $a1, buffer          # Buffer to store file content
-    li $a2, 200             # Number of bytes to read (adjust as needed)
+    li $a2, 1024             # Number of bytes to read (adjust as needed)
     syscall                 # Read the file into the buffer
 
     # Close the input file
@@ -638,6 +640,9 @@ nextRow:
     j    conv_row_loop
 
 print_matrix_convol:
+	li $v0,4
+	la $a0, titleOutputMatrix
+	syscall
     # Reset output matrix base address to start printing
     move $s7, $s4
 
@@ -736,6 +741,16 @@ positive:
     # Step 1: Extract integer part and reverse order
     
 start_extract_integer:
+    
+    mov.s $f12, $f0
+    jal is_increase_integer_part
+    
+    beq $v0, 1, increase_int_part
+    j dont_increase_int_part
+increase_int_part:
+    addi $t4, $t4,1
+    
+dont_increase_int_part:
 
     move $a0, $t4
     la   $a1, digitBufferForIntegerPart
@@ -792,6 +807,76 @@ done:
     li $v0, 10                    # Syscall to exit
     syscall
 
+
+# Function: is_increase_integer_part
+# Description: Extracts and rounds the first decimal digit from a floating-point number
+#              passed in $f12 and stores it in bufferOutput.
+# Parameters:
+#   $f12 - floating-point number (passed as a parameter)
+#   $a0 - base address of bufferOutput
+# Return:
+#	$v1 - store the flag if 1 => increase integer 
+
+is_increase_integer_part:
+    # Save registers to the stack
+    addiu $sp, $sp, -20           # Allocate space on the stack
+    sw $ra, 16($sp)               # Save return address
+    sw $s0, 12($sp)               # Save bufferOutput base address
+    sw $t9, 8($sp)                # Save temporary register $t9
+    sw $s6, 4($sp)                # Save temporary register $s6
+    sw $s7, 0($sp)                # Save temporary register $s7
+
+    li $v0, 0
+    # Step 1: Extract the integer part
+    cvt.w.s $f2, $f12             # Convert floating-point number in $f12 to integer
+    mfc1 $t4, $f2                 # Move integer part to $t4
+
+    # Step 2: Convert integer part back to float and subtract to get decimal part
+    cvt.s.w $f2, $f2              # Convert integer part back to float
+    l.s $f10, num_0.001
+    sub.s $f4, $f12, $f2          # $f4 = decimal part of the original number
+    add.s $f4, $f4, $f10
+    # Step 3: Multiply decimal part by 100 to shift the first two decimal digits
+    l.s $f6, num_100              # Load 100.0 into $f6
+    
+    mul.s $f4, $f4, $f6           # $f4 = decimal part * 100
+
+    # Step 4: Convert to integer to get the first two decimal digits
+    cvt.w.s $f8, $f4              # Convert $f4 to integer
+    mfc1 $t9, $f8                 # Move first two decimal digits to $t9
+
+    # Step 5: Extract first and second decimal digits
+    div $t9, $t9, 10              # Divide by 10 to get first and second digits
+    mfhi $s6                      # $s6 = second digit
+    mflo $t9                      # $t9 = first digit
+
+    # Step 6: Check second digit for rounding
+    li $s7, 5                     # Load 5 for rounding comparison
+    bge $s6, $s7, update_decimal_part        # If second digit >= 5, round up
+    j is_increase         
+    
+update_decimal_part:
+    addi $t9, $t9, 1              # Round up the first digit
+
+is_increase:
+    addi $t9, $t9, 48             # Convert to ASCII
+    #if the char is ":" store "0" to buffer
+    beq $t9, 58, update_flag
+    j dont_update
+update_flag:
+    addi $v0, $v0, 1	
+dont_update:
+    # Restore registers from the stack
+    lw $s7, 0($sp)                # Restore $s7
+    lw $s6, 4($sp)                # Restore $s6
+    lw $t9, 8($sp)                # Restore $t9
+    lw $s0, 12($sp)               # Restore bufferOutput base address
+    lw $ra, 16($sp)               # Restore return address
+    addiu $sp, $sp, 20            # Deallocate stack space
+
+	
+    jr $ra                         # Return to caller
+    
 # Function: extract_integer_part
 # Description: Extracts the integer part from a number in $a0, stores the digits in reverse order
 #              in the buffer at $a1, and returns the count of digits.
@@ -896,6 +981,14 @@ round_up:
 
 store_first_decimal:
     addi $t9, $t9, 48             # Convert to ASCII
+    #if the char is ":" store "0" to buffer
+    beq $t9, 58, store_zero
+    j store_to_buffer
+store_zero:
+    li $t9, 48
+    addi $v1, $v1, 1
+    j store_to_buffer
+store_to_buffer:
     sb $t9, 0($s0)                # Store in bufferOutput at $s0
     addiu $s0, $s0, 1             # Move bufferOutput pointer
     move $v0, $s0
@@ -916,6 +1009,9 @@ store_first_decimal:
 # Description: Prints the contents of bufferOutput.
 print_buffer:
     la $t5, bufferOutput          # Load bufferOutput address
+    li $v0,4
+    la $a0, titleOutputMatrix
+    syscall
 print_loop:
     lb $t6, 0($t5)                # Load byte from bufferOutput
     beq $t6, 0, end_print         # If null terminator, exit

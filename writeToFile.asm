@@ -1,6 +1,8 @@
 .data
 fout:    .asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/testcase/output/output.txt"
-float_array: .float -1.3, -1.5, -1.0999999,2.0,0.0, 1.0,0.0, 1.0, 0.0  # Array of floating-point numbers
+float_array: .float -234.99, -1.5, -1.9999999,1.99, 3.990, 1.0,0.0, 1.0, 0.0  # Array of floating-point numbers
+intNumBuffer: .float 1.99, 3.99
+sizeIntNum: .word 2
 array_size: .word 9                                 # Number of elements in the array
 newline: .asciiz "\n"                               # Newline character for formatting
 space: .asciiz " "
@@ -70,11 +72,21 @@ positive:
     # Step 1: Extract integer part and reverse order
     
 start_extract_integer:
-
+    mov.s $f12, $f0
+    jal is_increase_integer_part
+    
+    beq $v0, 1, increase_int_part
+    j dont_increase_int_part
+increase_int_part:
+    addi $t4, $t4,1
+    
+dont_increase_int_part:
     move $a0, $t4
     la   $a1, digitBufferForIntegerPart
     jal extract_integer_part      # Call function to extract integer part into bufferOutput
-	
+    
+    #if flag is 1 increase the number
+    
     # Reverse digitBuffer to get digits in correct order
     la $a0, digitBufferForIntegerPart           # Reset pointer to start of digitBuffer
     move $a1, $v0          # Number of digits in digitBuffer
@@ -125,6 +137,8 @@ done:
     # Exit program
     li $v0, 10                    # Syscall to exit
     syscall
+
+
 
 # Function: extract_integer_part
 # Description: Extracts the integer part from a number in $a0, stores the digits in reverse order
@@ -178,12 +192,85 @@ done_integer_part:
 
     jr $ra                         # Return to caller
 
+
+# Function: is_increase_integer_part
+# Description: Extracts and rounds the first decimal digit from a floating-point number
+#              passed in $f12 and stores it in bufferOutput.
+# Parameters:
+#   $f12 - floating-point number (passed as a parameter)
+#   $a0 - base address of bufferOutput
+# Return:
+#	$v1 - store the flag if 1 => increase integer 
+
+is_increase_integer_part:
+    # Save registers to the stack
+    addiu $sp, $sp, -20           # Allocate space on the stack
+    sw $ra, 16($sp)               # Save return address
+    sw $s0, 12($sp)               # Save bufferOutput base address
+    sw $t9, 8($sp)                # Save temporary register $t9
+    sw $s6, 4($sp)                # Save temporary register $s6
+    sw $s7, 0($sp)                # Save temporary register $s7
+
+    li $v0, 0
+    # Step 1: Extract the integer part
+    cvt.w.s $f2, $f12             # Convert floating-point number in $f12 to integer
+    mfc1 $t4, $f2                 # Move integer part to $t4
+
+    # Step 2: Convert integer part back to float and subtract to get decimal part
+    cvt.s.w $f2, $f2              # Convert integer part back to float
+    l.s $f10, num_0.001
+    sub.s $f4, $f12, $f2          # $f4 = decimal part of the original number
+    add.s $f4, $f4, $f10
+    # Step 3: Multiply decimal part by 100 to shift the first two decimal digits
+    l.s $f6, num_100              # Load 100.0 into $f6
+    
+    mul.s $f4, $f4, $f6           # $f4 = decimal part * 100
+
+    # Step 4: Convert to integer to get the first two decimal digits
+    cvt.w.s $f8, $f4              # Convert $f4 to integer
+    mfc1 $t9, $f8                 # Move first two decimal digits to $t9
+
+    # Step 5: Extract first and second decimal digits
+    div $t9, $t9, 10              # Divide by 10 to get first and second digits
+    mfhi $s6                      # $s6 = second digit
+    mflo $t9                      # $t9 = first digit
+
+    # Step 6: Check second digit for rounding
+    li $s7, 5                     # Load 5 for rounding comparison
+    bge $s6, $s7, update_decimal_part        # If second digit >= 5, round up
+    j is_increase         
+    
+update_decimal_part:
+    addi $t9, $t9, 1              # Round up the first digit
+
+is_increase:
+    addi $t9, $t9, 48             # Convert to ASCII
+    #if the char is ":" store "0" to buffer
+    beq $t9, 58, update_flag
+    j dont_update
+update_flag:
+    addi $v0, $v0, 1	
+dont_update:
+    # Restore registers from the stack
+    lw $s7, 0($sp)                # Restore $s7
+    lw $s6, 4($sp)                # Restore $s6
+    lw $t9, 8($sp)                # Restore $t9
+    lw $s0, 12($sp)               # Restore bufferOutput base address
+    lw $ra, 16($sp)               # Restore return address
+    addiu $sp, $sp, 20            # Deallocate stack space
+
+	
+    jr $ra                         # Return to caller
+
+
 # Function: extract_decimal_part
 # Description: Extracts and rounds the first decimal digit from a floating-point number
 #              passed in $f12 and stores it in bufferOutput.
 # Parameters:
 #   $f12 - floating-point number (passed as a parameter)
 #   $a0 - base address of bufferOutput
+# Return:
+#	$v1 - store the flag if 1 => increase integer 
 
 extract_decimal_part:
     # Save registers to the stack
@@ -196,7 +283,6 @@ extract_decimal_part:
 
     # Set up $s0 as the base address of bufferOutput from $a0
     move $s0, $a0                 # Move bufferOutput base address to $s0
-
     # Step 1: Extract the integer part
     cvt.w.s $f2, $f12             # Convert floating-point number in $f12 to integer
     mfc1 $t4, $f2                 # Move integer part to $t4
@@ -230,6 +316,14 @@ round_up:
 
 store_first_decimal:
     addi $t9, $t9, 48             # Convert to ASCII
+    #if the char is ":" store "0" to buffer
+    beq $t9, 58, store_zero
+    j store_to_buffer
+store_zero:
+    li $t9, 48
+    addi $v1, $v1, 1
+    j store_to_buffer
+store_to_buffer:    
     sb $t9, 0($s0)                # Store in bufferOutput at $s0
     addiu $s0, $s0, 1             # Move bufferOutput pointer
     move $v0, $s0
@@ -308,6 +402,7 @@ end_reverse:
     addiu $sp, $sp, 16            # Deallocate stack space
 
     jr $ra                         # Return to caller
+    
 # Function: writeDigitToBuffer
 # Description: Copies digits from digitBuffer to bufferOutput.
 # Parameters:
