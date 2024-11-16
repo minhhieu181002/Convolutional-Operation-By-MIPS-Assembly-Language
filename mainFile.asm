@@ -6,7 +6,8 @@
 #		    Date: 11/08/2024			    #
 #-----------------------------------------------------------#
 .data
-    inputFile:    .asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/C++/testcaseGeneration/testcases/testcase11.txt"   # Input file name
+    inputFileError:    .asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/C++/testcaseGeneration/error_testcases/testcase1.txt"   # Input file name
+    inputFile:		.asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/C++/testcaseGeneration/testcases/testcase40.txt"
     fout:    .asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/C++/output/output.txt"
     buffer:       .space 1024                                      # Buffer to read file content (adjust size if necessary)
     N:            .word 0                                         # To store image matrix size (N)
@@ -26,6 +27,8 @@
     titlePaddedMatrix: .asciiz "The image matrix after padded is: \n"
     titleOutputMatrix: .asciiz "The output matrix is: \n"
     titleBufferOutput: .asciiz "The buffer output is: \n"
+    errorInput: .asciiz "Error: Input value is out of range"
+    errorNotMatchSZ: .asciiz "Error: Size not match"
     zero:          .float 0.0         # Zero value for padding
     kernelMatrix: .asciiz "The Kernel Matrix"
     startPerformOperation: .asciiz "Start to perform convolutional operation...\n"
@@ -124,6 +127,14 @@ parse_s_loop:
     j parse_s_loop          # Loop until newline
 done_parsing:
     sw $t1, s               # Store parsed s
+    
+    #Validate the input 
+    lw $a0, N
+    lw $a1, M
+    lw $a2,p
+    lw $a3,s
+    jal validateInput
+    jal checkKernelSize
     # --- Dynamically allocate memory for 2 matrix ---
     lw $t1, N               # Load N (size of the image matrix)
     lw $t2, M
@@ -721,10 +732,22 @@ positive:
     # Check if the integer part is zero
     bne $t4, 0, start_extract_integer    # If integer part is not zero, skip to extraction
     
+    mov.s $f12, $f0
+    jal is_increase_integer_part
+    
+    beq $v0, 1, increase_int_part_zero
+    j dont_increase_int_part_zero
+increase_int_part_zero:
+    li $t5, '1'                   # Load ASCII '0'
+    sb $t5, 0($s0)                # Store '0' in bufferOutput
+    addiu $s0, $s0, 1
+    j parsingDecimalPart
+dont_increase_int_part_zero:
     #write 0 to buffer output
     li $t5, '0'                   # Load ASCII '0'
     sb $t5, 0($s0)                # Store '0' in bufferOutput
     addiu $s0, $s0, 1             # Advance bufferOutput pointer
+parsingDecimalPart:
     #passing number to parsing decimal part
     li $a0, '.'                   # ASCII for decimal point
     sb $a0, 0($s0)                # Store decimal point in bufferOutput
@@ -1197,6 +1220,7 @@ file_error:
     # Program ends
   #  li   $v0, 10                     # Exit system call
    # syscall
+  
 # DotProduct Function
 # Arguments:
 #   $a0 - base address of padded matrix
@@ -1253,3 +1277,96 @@ dot_product_done:
     li   $v0, 10                 # Exit the program
     syscall
 
+# Function: validateInput
+# Parameters: $a0 = N, $a1 = M, $a2 = padding (P), $a3 = stride (S)
+# Return: $v0 = 0 (invalid) or 1 (valid)
+
+validateInput:
+    # Save used registers onto the stack
+    addi $sp, $sp, -32      # Allocate space for 8 registers ($t0-$t7)
+    sw $t0, 0($sp)
+    sw $t1, 4($sp)
+    sw $t2, 8($sp)
+    sw $t3, 12($sp)
+    sw $t4, 16($sp)
+    sw $t5, 20($sp)
+    sw $t6, 24($sp)
+    sw $t7, 28($sp)
+
+    # Check if N is between 3 and 7
+    li $t0, 3               # Minimum N
+    li $t1, 7               # Maximum N
+    blt $a0, $t0, invalid   # If N < 3, invalid
+    bgt $a0, $t1, invalid   # If N > 7, invalid
+
+    # Check if M is between 2 and 4
+    li $t0, 2               # Minimum M
+    li $t1, 4               # Maximum M
+    blt $a1, $t0, invalid   # If M < 2, invalid
+    bgt $a1, $t1, invalid   # If M > 4, invalid
+
+    # Check if padding (P) is between 0 and 4
+    li $t0, 0               # Minimum padding
+    li $t1, 4               # Maximum padding
+    blt $a2, $t0, invalid   # If P < 0, invalid
+    bgt $a2, $t1, invalid   # If P > 4, invalid
+
+    # Check if stride (S) is between 1 and 3
+    li $t0, 1               # Minimum stride
+    li $t1, 3               # Maximum stride
+    blt $a3, $t0, invalid   # If S < 1, invalid
+    bgt $a3, $t1, invalid   # If S > 3, invalid
+
+    # If all checks pass, return 1 (valid)
+    li $v0, 1
+    j restore_registers
+
+invalid:
+    # Return 0 (invalid) if any check fails
+    li $v0, 4
+    la $a0, errorInput
+    syscall
+    li $v0, 10
+    syscall
+
+restore_registers:
+    # Restore registers from the stack
+    lw $t0, 0($sp)
+    lw $t1, 4($sp)
+    lw $t2, 8($sp)
+    lw $t3, 12($sp)
+    lw $t4, 16($sp)
+    lw $t5, 20($sp)
+    lw $t6, 24($sp)
+    lw $t7, 28($sp)
+    addi $sp, $sp, 32       # Deallocate stack space
+    jr $ra
+
+# Function: checkKernelSize
+# Parameters:
+#   $a0: N (image size)
+#   $a1: M (kernel size)
+# No return value
+checkKernelSize:
+    # Save used registers onto the stack
+    addi $sp, $sp, -8      # Allocate space for 2 registers ($t0, $ra)
+    sw $t0, 0($sp)         # Save $t0
+    sw $ra, 4($sp)         # Save $ra
+
+    # Compare M (kernel size) and N (image size)
+    bgt $a1, $a0, kernelExceeds # If M > N, terminate the program
+
+    # Restore registers and return
+    lw $t0, 0($sp)         # Restore $t0
+    lw $ra, 4($sp)         # Restore $ra
+    addi $sp, $sp, 8       # Deallocate stack space
+    jr $ra                 # Return to caller
+
+kernelExceeds:
+    # Kernel size exceeds image size, terminate program
+    li $v0, 4              # Syscall: Print string
+    la $a0, errorNotMatchSZ # Load error message
+    syscall
+
+    li $v0, 10             # Syscall: Terminate program
+    syscall
