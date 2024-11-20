@@ -19,8 +19,8 @@
     kernel: 	   .float 0.0:16
     output: 	   .float 0.0:196
     paddedSize:    .word 0					  # To store the size of padded matrix
-    newline:      .asciiz "\n"                                    # Newline string for printing
-    space:        .asciiz " "                                     # Space between matrix elements
+    newline:      .asciiz "\n"                                   # Newline string for printing
+    space:        .asciiz " "                                    # Space between matrix elements
     titleMatrix: .asciiz "The array of image and kernel matrices:\n"                   # Title for the image matrix
     titleImageMatrix: .asciiz "The image matrix is: "
     titleKernelMatrix: .asciiz "The kernel matrix is:\n "
@@ -33,9 +33,9 @@
     kernelMatrix: .asciiz "The Kernel Matrix"
     startPerformOperation: .asciiz "Start to perform convolutional operation...\n"
     bufferOutput: .space 1024                           # Buffer to store the final formatted result
-    digitBufferForIntegerPart: .space 10                              # Temporary buffer for storing digits in reverse order
+    digitBufferForIntegerPart: .space 10           # Temporary buffer for storing digits in reverse order
     num_zero: .float 0.0                           # Constant 100.0 for scaling
-    num_10: .float 10.0                                 # Constant 10.0 for scaling
+    num_10: .float 10.0                            # Constant 10.0 for scaling
     num_100: .float 100.0    
     num_0.001: .float 0.001
 
@@ -117,8 +117,7 @@ parse_s:
     li $t1, 0               # Reset the value for s
 parse_s_loop:
     lb $t2, 0($t0)          # Load the next character for s
-    beq $t2, 46, done_parsing  # Break on newline (ASCII 13) - carriage return
-    #beq $t2, 10, done_parsing
+    beq $t2, 46, done_parsing  # Break when meet "." char
     sub $t2, $t2, 48        # Convert ASCII to integer
     mul $t1, $t1, 10        # Multiply by 10 to shift left
     add $t1, $t1, $t2       # Add parsed digit to s
@@ -154,9 +153,8 @@ done_parsing:
 
     # --- Parsing the image matrix ---
     addi $t0, $t0, 4        # Move pointer after the first row
-    li $t3, 0 		#variable for check negative
+    li $t3, 0 		     #variable for check negative
     li $t5, 0               # Index counter for image matrix elements
-    #li $t6, 6               # Load the size of the image matrix (N * N)
 
 parse_matrix:
     beq $t5, $t6, done_parsing_matrices  # Stop when all elements are parsed
@@ -177,11 +175,6 @@ parse_matrix:
 done_parsing_matrices:
     jal copy_to_image_matrix
     jal initialize_padded_image
-    #j print_matrix
-   
-    # Exit the program
-    li $v0, 10              # Syscall for exit
-    syscall
 	
 # --- Function to parse a floating-point number from the buffer ---
 parse_floating_point:
@@ -211,7 +204,7 @@ nextDigit:
 	j parse_floating_point
 saveSign:
 	addi $t3,$t3, 1    #the is number is negative number
-	addi $t0, $t0, 1 #ignore this sign
+	addi $t0, $t0, 1   #ignore this sign
 	j parse_floating_point
 	
 parse_fraction_part:
@@ -227,8 +220,8 @@ parse_fraction_loop:
 	cvt.s.w $f2,$f2
 	div.s $f2, $f2, $f9     # divide the digit by the dividor 4.0 -> 0.4
 	add.s $f6,$f6, $f2     #accumlate the fractinal part
-	li $t1, 0x41200000                      # Load 10.0 (IEEE 754 for 10.0) into $t1
-    	mtc1 $t1, $f10                           # Move 10.0 into floating-point register $f9 (divisor for fractional part)
+	li $t1, 0x41200000      # Load 10.0 (IEEE 754 for 10.0) into $t1
+    	mtc1 $t1, $f10 		# Move 10.0 into floating-point register $f9 (divisor for fractional part)
 	mul.s $f9,$f9,$f10     #multiply divisor by 10 for the next fractional digit
 	addi $t0,$t0,1
 	j parse_fraction_loop
@@ -256,7 +249,6 @@ copy_to_image_matrix:
 	move $t3,$a0    #base address of 2 matrix
 	lw $t1, N  
 	mul $t1, $t1, $t1 #$t1 = number of element of image matrix
-	#li $t0, 4
 	li $t2, 0 #counter
 copy_loop:
 	bge $t2, $t1, done_copy
@@ -335,7 +327,6 @@ initialize_padded_image:
 
     li  $t5, 0                   # Initialize counter for the number of elements (total number of elements in the matrix)
 initialize_loop:
-    #mul $t2, $t1, $t1            # t2 = paddedSize * paddedSize (total number of elements)
     bge $t5, $t2, initialize_done # Exit loop if all elements initialized
 
     # Store 0.0 into the current matrix position
@@ -346,18 +337,13 @@ initialize_loop:
     j    initialize_loop          # Repeat the loop
 
 initialize_done:
-    # Call the function to print the padded matrix
-    #move $a0, $t1                # Pass the size of the padded matrix (N + 2 * padding)
-    #move $a1, $v0                # Base address of the padded matrix
-    #jal insert_image_to_padded
-    #jr  $ra                      # Return to the caller
+
 ############################ INSERT IMAGE INTO THE PADDING IMAGE ############################
 insert_image_to_padded:
-    lw  $t0, p                   # Load the padding size
-    lw  $t1, paddedSize                 #size of padded matrix  
-    lw  $t8, N   # Load the image matrix size (N)
-    #$s2                # Base address of the padded matrix (already allocated)
-    la   $t2, image       # Base address of the image matrix
+    lw  $t0, p                  # Load the padding size
+    lw  $t1, paddedSize         # size of padded matrix  
+    lw  $t8, N   		 # Load the image matrix size (N)
+    la   $t2, image       	# Base address of the image matrix
 
     li   $t3, 0                  # Initialize row index for the image matrix
 insert_image_rows:
@@ -369,11 +355,7 @@ insert_image_columns:
 
     # Load the element from the image matrix
     l.s $f0, 0($t2)             # Load the element at position (row, col) of the image matrix
-    #li $v0, 2               # Syscall to print a floating-point number
-    #syscall                 # Print the floating-point number
-    # Calculate the target position in the padded matrix
-    # padded_row = t3 + paddingNum
-    # padded_col = t4 + paddingNum
+ 
     add  $t5, $t3, $t0           # Calculate padded_row = image_row + paddingNum
     add  $t6, $t4, $t0           # Calculate padded_col = image_col + paddingNum
 
@@ -443,7 +425,7 @@ next_row:
     j    print_rows
 
 print_done:
-    #jr   $ra                      # Return to the caller
+   
 
 ############################ RETRIEVE THE KERNEL MATRIX ############################
 # Step 1: Load the size of the image and kernel matrices
@@ -559,12 +541,7 @@ print_kernel_done:
     # Step 3: Allocate memory for the output matrix dynamically (dimension * dimension * 4)
     lw   $t9, outputSize             # Load the calculated dimension
     mul  $t9, $t9, $t9               # Calculate total elements: dimension * dimension
-    #li   $t0, 4                      # Each element is 4 bytes
-    #mul  $t9, $t9, $t0               # Total bytes to allocate: total elements * 4
-    #li   $v0, 9                      # System call for sbrk (memory allocation)
-    #move $a0, $t9                    # Request memory of size in bytes
-    #syscall
-    #move $s4, $v0                    # Save base address of dynamically allocated output matrix in $s4
+    
     la $s7, output		      # Load the address of output matrix
     # Step 5: Start the convolution operation loop
     li   $t0, 0                      # i = 0 (initialize output row index)
@@ -660,11 +637,10 @@ print_newline_convol:
 
 write_to_file_function:
     # Load array information
-    la $t0, output           # $t0 points to start of float_array
+    la $t0, output           # $t0 points to start of float output array 
     lw $t1, outputSize            # Load the size of the array into $t1
     mul $t1, $t1, $t1	#outputSize * outputSize
     la $s0, bufferOutput          # Pointer to bufferOutput to store the final formatted result
-    #la $s1, digitBufferForIntegerPart
     li $s7, 0                     # Initialize index to 0
 
 loop_array:
@@ -673,9 +649,9 @@ loop_array:
 
     # Load the next floating-point number
     l.s $f0, 0($t0)               # Load float from array into $f0
-    l.s $f4, num_zero                  # Load 0.0 into $f4
-    c.lt.s $f0, $f4                # Check if $f0 < 0
-    bc1f positive                  # If not negative, branch to positive
+    l.s $f4, num_zero             # Load 0.0 into $f4
+    c.lt.s $f0, $f4               # Check if $f0 < 0
+    bc1f positive                 # If not negative, branch to positive
 
 negative:
     # Number is negative, so store '-' sign
