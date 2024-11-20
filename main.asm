@@ -1,15 +1,15 @@
-#-----------------------------------------------------------#
+#--------------------------------------------------------- #
 #		 PROJECT COMPUTER ARCHITECTURE		    #
 #		    TITLE: Convolutional Operation	    #
-#		    Author: Hua Vũ Minh Hieu		    #
+#		    Author: Hua Vu Minh Hieu		    #
 #		    Stu. ID: 2052990			    #
 #		    Date: 11/08/2024			    #
-#-----------------------------------------------------------#
+#--------------------------------------------------------- #
 .data
-    inputFileError:    .asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/C++/testcaseGeneration/error_testcases/testcase1.txt"   # Input file name
-    inputFile:		.asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/C++/testcaseGeneration/testcases/testcase40.txt"
+    inputFileError:    .asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/C++/testcaseGeneration/error_testcases/testcase12.txt"   # Input file name
+    inputFile:		.asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/C++/input/input.txt"
     fout:    .asciiz "D:/Materials_Study_Uni/Fourth year/CA/Assignment 241/Mips/main/Convolutional-Operation-By-MIPS-Assembly-Language/C++/output/output.txt"
-    buffer:       .space 1024                                      # Buffer to read file content (adjust size if necessary)
+    buffer:       .space 1024                                     # Buffer to read file content (adjust size if necessary)
     N:            .word 0                                         # To store image matrix size (N)
     M:            .word 0                                         # To store kernel matrix size (M)
     p:            .word 0                                         # To store padding value (p)
@@ -17,7 +17,7 @@
     outputSize:	   .word 0
     image: 	  .float 0.0:50
     kernel: 	   .float 0.0:16
-    ouput: 	   .float 0.0:196
+    output: 	   .float 0.0:196
     paddedSize:    .word 0					  # To store the size of padded matrix
     newline:      .asciiz "\n"                                    # Newline string for printing
     space:        .asciiz " "                                     # Space between matrix elements
@@ -34,15 +34,15 @@
     startPerformOperation: .asciiz "Start to perform convolutional operation...\n"
     bufferOutput: .space 1024                           # Buffer to store the final formatted result
     digitBufferForIntegerPart: .space 10                              # Temporary buffer for storing digits in reverse order
-	num_zero: .float 0.0                           # Constant 100.0 for scaling
-	num_10: .float 10.0                                 # Constant 10.0 for scaling
-	num_100: .float 100.0    
-	num_0.001: .float 0.001
+    num_zero: .float 0.0                           # Constant 100.0 for scaling
+    num_10: .float 10.0                                 # Constant 10.0 for scaling
+    num_100: .float 100.0    
+    num_0.001: .float 0.001
 
 .text
     # Open the file for reading
     li $v0, 13              # Syscall for opening a file
-    la $a0, inputFile       # Load the file name
+    la $a0, inputFile  # Load the file name
     li $a1, 0               # Open for reading (flag 0)
     li $a2, 0               # Mode is ignored for reading
     syscall                 # Open the file
@@ -69,7 +69,6 @@
 parse_N_loop:
     lb $t2, 0($t0)          # Load first byte (ASCII value of the first character)
     beq $t2, 46, parse_M
-    #beq $t2, 32, parse_M    # Break on space (ASCII 32) to move to the next number
     sub $t2, $t2, 48        # Convert ASCII to integer (subtract ASCII '0')
     mul $t1, $t1, 10        # Shift left (multiply by 10 to prepare for the next digit)
     add $t1, $t1, $t2       # Add the parsed digit to the value
@@ -176,10 +175,8 @@ parse_matrix:
     j parse_matrix                       # Loop until all elements are parsed
 
 done_parsing_matrices:
-    # Print the Image Matrix
-    #jal initialize_padded_image
     jal copy_to_image_matrix
-    jal print_matrix
+    jal initialize_padded_image
     #j print_matrix
    
     # Exit the program
@@ -252,48 +249,6 @@ conToNegNum:
 	li $t3, 0
 	jr $ra
 		
-
-# --- Function to print the image matrix ---
-print_matrix:
-    # Print the title of the matrix
-    li $v0, 4               # Syscall to print a string
-    la $a0, titleMatrix # Load the title for the image matrix
-    syscall                 # Print the title
-
-    # Load N (size of the matrix)
-    #li $t1, 6               # Load the size of the matrix N
-    #mul $t1, $t1, $t1       # Calculate N * N (total elements in the image matrix)
-    
-    # Loop to print each floating-point element in the matrix
-    
-    la $a0, 0($s1)
-    move $t2, $a0           # Set starting address of the image matrix in memory
-    li $t3, 0               # Initialize element counter
-
-print_matrix_loop:
-    beq $t3, $t6, end_print_matrix  # Stop when all elements are printed
-
-    l.s $f12, 0($t2)        # Load a floating-point value from the image matrix
-    li $v0, 2               # Syscall to print a floating-point number
-    syscall                 # Print the floating-point number
-
-    # Print a space after each element
-    li $v0, 4               # Syscall to print a string
-    la $a0, space           # Load space string
-    syscall                 # Print space
-
-    # Move to the next element in the matrix
-    addi $t2, $t2, 4        # Move to the next element (4 bytes per float)
-    addi $t3, $t3, 1        # Increment element counter
-    j print_matrix_loop     # Continue printing elements
-
-end_print_matrix:
-    # Print a newline at the end
-    li $v0, 4               # Syscall to print a string
-    la $a0, newline         # Load newline string
-    syscall                 # Print newline
-    j initialize_padded_image
-    #jr $ra                  # Return to caller
 ########################## COPY TO IMAGE MATRIX ############################
 copy_to_image_matrix:
 	la $t0, image	#base address of the image matrix
@@ -316,9 +271,9 @@ copy_loop:
 done_copy:
 	la $t0, image
 	lw $t1, N
-	mul $t1, $t1, $t1 #size of image
+	mul $t3, $t1, $t1 #size of image
 	li $t2, 0 #counter
-	
+	li $t4, 0 #row counter
 	li $v0, 4
 	la $a0, titleImageMatrix
 	syscall
@@ -327,20 +282,28 @@ done_copy:
 	la $a0, newline
 	syscall
 print_image_matrix:
-	bge $t2, $t1, end_print
+	bge $t2, $t3, end_print
 	l.s $f12, 0($t0)        # Load a floating-point value from the image matrix
     	li $v0, 2               # Syscall to print a floating-point number
     	syscall                 # Print the floating-point number
 
-    	# Print a space after each element
-    	li $v0, 4               # Syscall to print a string
-    	la $a0, space           # Load space string
-    	syscall                 # Print space
-
-    	# Move to the next element in the matrix
-    	addi $t0, $t0, 4        # Move to the next element (4 bytes per float)
+    	addi $t0, $t0, 4        # Move to the next element 
     	addi $t2, $t2, 1        # Increment element counter
+    	addi $t4, $t4, 1 	# Increment row counter
+    	
+    	bne $t4, $t1, printSpace
+    	
+    	li $v0, 4
+    	la $a0, newline
+    	syscall
+    	
+    	li $t4, 0		# Reset counter
     	j print_image_matrix     # Continue printing elements
+printSpace:
+	li $v0, 4
+	la $a0, space
+	syscall
+	j print_image_matrix
 end_print:
 	li $v0, 4
 	la $a0, newline
@@ -553,7 +516,7 @@ print_newline:
         syscall                  # Print newline after printing 2 elements (row complete)
         li   $t9, 0              # Reset row element counter
 
-    next_element:
+next_element:
         addi $t8, $t8, 1         # Move to the next element in the kernel matrix
         addi $t7, $t7, 4         # Move to the next position in memory (4 bytes per float)
         j    print_kernel        # Repeat for the next element
@@ -596,13 +559,13 @@ print_kernel_done:
     # Step 3: Allocate memory for the output matrix dynamically (dimension * dimension * 4)
     lw   $t9, outputSize             # Load the calculated dimension
     mul  $t9, $t9, $t9               # Calculate total elements: dimension * dimension
-    li   $t0, 4                      # Each element is 4 bytes
-    mul  $t9, $t9, $t0               # Total bytes to allocate: total elements * 4
-    li   $v0, 9                      # System call for sbrk (memory allocation)
-    move $a0, $t9                    # Request memory of size in bytes
-    syscall
-    move $s4, $v0                    # Save base address of dynamically allocated output matrix in $s4
-    move $s7, $s4 #use for increase space
+    #li   $t0, 4                      # Each element is 4 bytes
+    #mul  $t9, $t9, $t0               # Total bytes to allocate: total elements * 4
+    #li   $v0, 9                      # System call for sbrk (memory allocation)
+    #move $a0, $t9                    # Request memory of size in bytes
+    #syscall
+    #move $s4, $v0                    # Save base address of dynamically allocated output matrix in $s4
+    la $s7, output		      # Load the address of output matrix
     # Step 5: Start the convolution operation loop
     li   $t0, 0                      # i = 0 (initialize output row index)
 conv_row_loop:
@@ -655,7 +618,7 @@ print_matrix_convol:
 	la $a0, titleOutputMatrix
 	syscall
     # Reset output matrix base address to start printing
-    move $s7, $s4
+    la $s7, output
 
     # Step 6: Print the output matrix
     li   $t0, 0                      # i = 0 (row index)
@@ -697,7 +660,7 @@ print_newline_convol:
 
 write_to_file_function:
     # Load array information
-    move $t0, $s4           # $t0 points to start of float_array
+    la $t0, output           # $t0 points to start of float_array
     lw $t1, outputSize            # Load the size of the array into $t1
     mul $t1, $t1, $t1	#outputSize * outputSize
     la $s0, bufferOutput          # Pointer to bufferOutput to store the final formatted result
@@ -724,7 +687,6 @@ negative:
     neg.s $f0, $f0                 # Negate $f0 to make it positive
 
 positive:
-    #check the integer part here
     #if the first digit is zero: no need to extract
     cvt.w.s $f2, $f0              # Convert float in $f0 to integer
     mfc1 $t4, $f2                 # Move integer part to $t4
@@ -1033,7 +995,7 @@ store_to_buffer:
 print_buffer:
     la $t5, bufferOutput          # Load bufferOutput address
     li $v0,4
-    la $a0, titleOutputMatrix
+    la $a0, titleBufferOutput
     syscall
 print_loop:
     lb $t6, 0($t5)                # Load byte from bufferOutput
